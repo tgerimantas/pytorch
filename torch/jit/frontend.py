@@ -182,7 +182,8 @@ def check_and_indent_multiline_strings(sourcelines):
     """
     This is a helper function which checks for multiline strings and
     indents the strings by calculating the leading space and appending
-    the spaces to each line of the multiline string.
+    the spaces to each line of the multiline string. The failure to indent
+    multiline strings causes failures during downstream dedent
 
     Arguments:
         sourcelines: This is an array of source lines of the function
@@ -191,14 +192,13 @@ def check_and_indent_multiline_strings(sourcelines):
 
     """
     indices = []
+    triple_quotes = '\"\"\"'
     # Extract the start and end line number of the multiline string
     for index, source in enumerate(sourcelines):
-        if '\"\"\"' in source and source.find('\"\"\"') == source.rfind('\"\"\"'):
+        if triple_quotes in source and source.find(triple_quotes) == source.rfind(triple_quotes):
             indices.append(index)
-    # If no multiline string, we have nothing to do.
-    if len(indices) == 0:
-        return sourcelines
-    # Adding the leading space for every line of the multiline string
+
+    # Adding leading space for every line of the multiline string
     for i in range(0, len(indices), 2):
         start = indices[i]
         end = indices[i + 1]
