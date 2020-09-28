@@ -358,10 +358,7 @@ class TestOptim(TestCase):
                     if iter == 0:
                         model.parameters().__next__().grad = None
 
-                    def closure():
-                        return torch.Tensor([10])
-
-                    optimizer.step(closure)
+                    optimizer.step()
 
                 res.append(model.parameters())
 
