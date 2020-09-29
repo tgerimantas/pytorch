@@ -67,7 +67,7 @@ def map_arg(a: Argument, fn: Callable[[Node], Argument]) -> Argument:
 
 class Graph:
     def __init__(self):
-        self._nodes : List[Node] = []
+        self._nodes : List[Node] = [Node(self, 'return', 'return', 'return', (), {})]
         self._used_names : Dict[str, int] = {}  # base name -> number
 
     @property
@@ -80,7 +80,10 @@ class Graph:
         """
         val_map : Dict[Node, Node] = {}
         for node in g._nodes:
+            if node.op == 'return':
+                continue
             val_map[node] = self.node_copy(node, lambda n : val_map[n])
+
 
     def _mark_uses(self, a: Argument):
         def add_use(n: Node):
@@ -98,8 +101,9 @@ class Graph:
         self._mark_uses(args)
         self._mark_uses(kwargs)
         sanitized_name = self._register_name_used(name) if name is not None else self._name(target)
-        n = Node(self, sanitized_name, op, target, args, kwargs)
-        self._nodes.append(n)
+        n = Node(self, name if name is not None else self._name(target), op, target, args, kwargs)
+        assert self._nodes[-1].op == 'return'
+        self._nodes.insert(-1, n)
         return n
 
     # sugar for above when you know the op
@@ -157,8 +161,16 @@ class Graph:
         return self.create_node(node.op, node.target, args, kwargs, name)
 
     def output(self, result: Argument):
-        self.result = result
-        self._mark_uses(result)
+        assert len(self._nodes) != 0
+        assert self._nodes[-1].op == 'return'
+        # Indiscriminately dumping everything into a tuple here. The user-provided
+        # `result` value will always be result.args[0]
+        self._nodes[-1].args = (result,)
+
+    @property
+    def result(self):
+        assert self._nodes[-1].op == 'return'
+        return self.nodes[-1].args[0]
 
     def _name(self, target: Target) -> str:
         if callable(target):
@@ -236,10 +248,14 @@ class Graph:
                 assert isinstance(node.target, str)
                 body.append(f'{node.name} = {_format_target(root_module, node.target)}\n')
                 continue
+            elif node.op == 'return':
+                continue
             raise NotImplementedError(f'node: {node.op} {node.target}')
 
         src = ''.join(body)
-        return src, str(self.result), free_vars
+        return_node = self._nodes[-1]
+        assert return_node.op == 'return'
+        return src, str(self._nodes[-1].args[0]), free_vars
 
     def __str__(self) -> str:
         placeholder_names : List[str] = []
@@ -268,6 +284,8 @@ class Graph:
                 return None
             elif n.op == 'get_attr':
                 return f'%{n.name} : [uses={n.uses}] = self.{n.target}'
+            elif n.op == 'return':
+                return f'return {n.args}'
             else:
                 return f'%{n.name} : [uses={n.uses}] = {n.op}[target={n.target}](' \
                        f'args = {format_arg(n.args)}, kwargs = {format_arg(n.kwargs)})'
@@ -279,8 +297,6 @@ class Graph:
         for node_str in node_strs:
             if node_str:
                 s += '\n    ' + node_str
-        if hasattr(self, 'result'):
-            s += f'\n    return {format_arg(self.result)}'
         return s
 
     def lint(self, root : Optional[torch.nn.Module] = None):
@@ -290,6 +306,7 @@ class Graph:
             - Checks Nodes have correct ownership (owned by this graph)
             - Checks Nodes appear in topological order
             - If `root` is provided, checks that `target`s exist in `root`
+            - Check for exactly one `return` node at the end of the Graph
         """
 
         # Check topo order
@@ -305,8 +322,9 @@ class Graph:
 
         seen_names : Set[str] = set()
         seen_values : Set[Node] = set()
-        for node in self._nodes:
-            if node.op not in ['placeholder', 'call_method', 'call_module', 'call_function', 'get_attr']:
+        return_node_idx : Optional[int] = None
+        for i, node in enumerate(self._nodes):
+            if node.op not in ['placeholder', 'call_method', 'call_module', 'call_function', 'get_attr', 'return']:
                 raise RuntimeError(f'Node {node} had unknown opcode {node.op}!')
             if node.graph is not self:
                 raise RuntimeError(f'Node \'{node}\' does not belong to this Graph!')
@@ -317,6 +335,16 @@ class Graph:
             if node.name in seen_names:
                 raise RuntimeError(f'Node redefined name {node.name}!')
             seen_names.add(node.name)
+
+            if node.op == 'return':
+                if return_node_idx:
+                    raise RuntimeError('Multiple return nodes in this graph!')
+                return_node_idx = i
+
+        if return_node_idx is None:
+            raise RuntimeError('This graph had no return node!')
+        elif return_node_idx != len(self._nodes) - 1:
+            raise RuntimeError('Return node was not the last node in the graph!')
 
         if hasattr(self, 'result'):
             map_arg(self.result, check_arg)
