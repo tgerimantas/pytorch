@@ -168,15 +168,21 @@ def _env_rendezvous_handler(url, timeout=default_pg_timeout, **kwargs):
     master_port = os.environ.get("MASTER_PORT", None)
     if master_port is None:
         raise _env_error("MASTER_PORT")
+		
+	tunnel_port  = os.environ.get("TUNNEL_PORT", None)
+	if tunnel_port is None:
+        raise _env_error("TUNNEL_PORT")
 
     # Converting before creating the store
     rank = int(rank)
     world_size = int(world_size)
     master_port = int(master_port)
+	tunnel_port = int(tunnel_port)
+	
 
     # Now start the TCP store daemon on the rank 0
     start_daemon = rank == 0
-    store = TCPStore(master_addr, master_port, world_size, start_daemon, timeout)
+    store = TCPStore(master_addr, master_port, tunnel_port, world_size, start_daemon, timeout)
     yield (store, rank, world_size)
 
     # If this configuration is invalidated, there is nothing we can do about it

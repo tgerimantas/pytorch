@@ -173,6 +173,10 @@ def parse_args():
                         help="Master node (rank 0)'s free port that needs to "
                              "be used for communication during distributed "
                              "training")
+    parser.add_argument("--tunnel_port", default=29500, type=int,
+                        help="For tunnel node port that needs to "
+                             "be used for communication during distributed "
+                             "training")
     parser.add_argument("--use_env", default=False, action="store_true",
                         help="Use environment variable to pass "
                              "'local rank'. For legacy reasons, the default value is False. "
@@ -207,6 +211,7 @@ def main():
     current_env = os.environ.copy()
     current_env["MASTER_ADDR"] = args.master_addr
     current_env["MASTER_PORT"] = str(args.master_port)
+	current_env["TUNNEL_PORT"] = str(args.tunnel_port)
     current_env["WORLD_SIZE"] = str(dist_world_size)
 
     processes = []

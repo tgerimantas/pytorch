@@ -287,6 +287,7 @@ bool TCPStoreDaemon::checkKeys(const std::vector<std::string>& keys) const {
 TCPStore::TCPStore(
     const std::string& masterAddr,
     PortType masterPort,
+	PortType tunnelPort,
     int numWorkers,
     bool isServer,
     const std::chrono::milliseconds& timeout,
@@ -295,12 +296,13 @@ TCPStore::TCPStore(
       isServer_(isServer),
       tcpStoreAddr_(masterAddr),
       tcpStorePort_(masterPort),
+	  tcpStoreTunnelPort_(tunnelPort),
       numWorkers_(numWorkers),
       initKey_("init/"),
       regularPrefix_("/") {
   if (isServer_) {
-    // Opening up the listening socket
-    std::tie(masterListenSocket_, tcpStorePort_) = tcputil::listen(masterPort);
+    // Opening up the listening socket // tunnelPort -> masterPort;  tcpStoreTunnelPort_ -> tcpStorePort_
+    std::tie(masterListenSocket_, tcpStoreTunnelPort_) = tcputil::listen(tunnelPort); 
     // Now start the daemon
     tcpStoreDaemon_ = std::unique_ptr<TCPStoreDaemon>(
         new TCPStoreDaemon(masterListenSocket_));
