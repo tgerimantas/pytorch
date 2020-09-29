@@ -65,10 +65,22 @@ def map_arg(a: Argument, fn: Callable[[Node], Argument]) -> Argument:
     else:
         return a
 
+class WithInsertPoint:
+    def __init__(self, n : Node):
+        self.n = n
+
+    def __enter__(self):
+        self.orig_insert_point = self.n.graph._insert_point
+        self.n.graph._insert_point = self.n
+
+    def __exit__(self, type, value, tb):
+        self.n.graph._insert_point = self.orig_insert_point
+
 class Graph:
     def __init__(self):
         self._nodes : List[Node] = [Node(self, 'return', 'return', 'return', (), {})]
         self._used_names : Dict[str, int] = {}  # base name -> number
+        self._insert_point : Node = self._nodes[-1]
 
     @property
     def nodes(self):
@@ -102,9 +114,77 @@ class Graph:
         self._mark_uses(kwargs)
         sanitized_name = self._register_name_used(name) if name is not None else self._name(target)
         n = Node(self, name if name is not None else self._name(target), op, target, args, kwargs)
-        assert self._nodes[-1].op == 'return'
-        self._nodes.insert(-1, n)
+        self.insert_node_before(n=n, before=self._insert_point)
         return n
+
+    def insert_node_before(self, n : Node, before : Node) -> Node:
+        """
+        Insert node `n` directly before `before` in the topological ordering of nodes
+        """
+        # TODO: computationally inefficient
+        before_idx = self._nodes.index(before)
+        self._nodes.insert(before_idx, n)
+        return n
+
+    def find_all_uses_of(self, to_find : Node) -> List[Node]:
+        """
+        Find all nodes that use `to_find` in their args or kwargs
+        """
+        # TODO: computationally inefficient
+        def find_use(arg : Any) -> bool:
+            if isinstance(arg, (tuple, list)):
+                return any(find_use(elem) for elem in arg)
+            elif isinstance(arg, dict):
+                return any(find_use(v) for k, v in arg.items())
+            elif isinstance(arg, slice):
+                return any([find_use(arg.start), find_use(arg.stop), find_use(arg.step)])
+            elif isinstance(arg, Node):
+                return arg is to_find
+            else:
+                return False
+
+        return [node for node in self._nodes if find_use(node.args) or find_use(node.kwargs)]
+
+    def replace_all_uses_with(self, to_replace : Node, replace_with : Node):
+        """
+        Find all uses of the value produced by `to-replace` and swap out those references for the value produced
+        by `replace_with`. Does not delete `to_replace`.
+        """
+        def replace_node(n : Node) -> Argument:
+            if n is to_replace:
+                return replace_with
+            else:
+                return n
+
+        # TODO: computationally inefficient
+        for node in self._nodes:
+            new_args = map_arg(node.args, replace_node)
+            assert isinstance(new_args, tuple)
+            node.args = new_args
+
+            new_kwargs = map_arg(node.kwargs, replace_node)
+            assert isinstance(new_kwargs, dict)
+            node.kwargs = new_kwargs
+
+    def erase_node(self, to_erase : Node):
+        """
+        Erases the node `to_erase` from the `Graph`. Throws an exception if
+        there are still uses of that node in the graph.
+        """
+        # Assert there are no uses of this Node
+        def check_for_use(arg : Node):
+            if arg is to_erase:
+                raise RuntimeError(f'Trying to erase node {to_erase} but it still has uses!')
+        for node in self._nodes:
+            map_arg(node.args, check_for_use)
+            map_arg(node.kwargs, check_for_use)
+        if self.result:
+            map_arg(self.result, check_for_use)
+
+        # TODO: computationally inefficient
+        node_indices = [i for i, n in enumerate(self._nodes) if n == to_erase]
+        for idx in reversed(node_indices):
+            self._nodes.pop(idx)
 
     # sugar for above when you know the op
     def placeholder(self, name: str) -> Node:
