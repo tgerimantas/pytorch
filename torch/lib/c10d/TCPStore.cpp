@@ -287,7 +287,7 @@ bool TCPStoreDaemon::checkKeys(const std::vector<std::string>& keys) const {
 TCPStore::TCPStore(
     const std::string& masterAddr,
     PortType masterPort,
-	PortType tunnelPort,
+    PortType tunnelPort,
     int numWorkers,
     bool isServer,
     const std::chrono::milliseconds& timeout,
@@ -296,7 +296,7 @@ TCPStore::TCPStore(
       isServer_(isServer),
       tcpStoreAddr_(masterAddr),
       tcpStorePort_(masterPort),
-	  tcpStoreTunnelPort_(tunnelPort),
+      tcpStoreTunnelPort_(tunnelPort),
       numWorkers_(numWorkers),
       initKey_("init/"),
       regularPrefix_("/") {

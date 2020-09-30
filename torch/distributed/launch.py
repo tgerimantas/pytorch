@@ -211,7 +211,7 @@ def main():
     current_env = os.environ.copy()
     current_env["MASTER_ADDR"] = args.master_addr
     current_env["MASTER_PORT"] = str(args.master_port)
-	current_env["TUNNEL_PORT"] = str(args.tunnel_port)
+    current_env["TUNNEL_PORT"] = str(args.tunnel_port)
     current_env["WORLD_SIZE"] = str(dist_world_size)
 
     processes = []
