@@ -247,7 +247,7 @@ def create_tcp_store(addr):
         try:
             port = common.find_free_port()
             ports.append(port)
-            return c10d.TCPStore(addr, port, 1, True)
+            return c10d.TCPStore(addr, port, 0, 1, True)
         except RuntimeError as error:
             if str(error) == "Address already in use":
                 continue
@@ -270,8 +270,8 @@ class TCPStoreTest(TestCase, StoreTestBase):
             # Use noqa to silence flake8.
             # Need to store in an unused variable here to ensure the first
             # object is not destroyed before the second object is created.
-            store1 = c10d.TCPStore(addr, port, 1, True)  # noqa: F841
-            store2 = c10d.TCPStore(addr, port, 1, True)  # noqa: F841
+            store1 = c10d.TCPStore(addr, port, 0, 1, True)  # noqa: F841
+            store2 = c10d.TCPStore(addr, port, 0, 1, True)  # noqa: F841
 
     def _test_numkeys_delkeys(self, fs):
         # We start off with one init key in the store to coordinate workers

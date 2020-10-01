@@ -29,7 +29,7 @@ class TestE2EBase : public ::testing::Test {
 
     // Setup server store.
     store = std::make_shared<c10d::TCPStore>(
-        serverAddress, 0, numWorkers, true, std::chrono::seconds(10));
+        serverAddress, 0, 0, numWorkers, true, std::chrono::seconds(10));
 
     buildRpcAgent();
 

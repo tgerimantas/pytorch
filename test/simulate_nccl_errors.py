@@ -22,7 +22,7 @@ if __name__ == "__main__":
     world_size = int(args.world_size)
     port = int(args.port)
 
-    store = c10d.TCPStore(args.addr, port, world_size, rank == 0)
+    store = c10d.TCPStore(args.addr, port, 0, world_size, rank == 0)
     process_group = c10d.ProcessGroupNCCL(store, rank, world_size)
     logging.info('Running first allreduce')
     process_group.allreduce(torch.rand(10).cuda(rank)).wait()
